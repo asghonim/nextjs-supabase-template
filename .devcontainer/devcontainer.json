@@ -22,7 +22,8 @@
 				"ms-playwright.playwright",
 				"Anthropic.claude-code",
 				"alexkrechik.cucumberautocomplete",
-				"tamasfe.even-better-toml"
+				"tamasfe.even-better-toml",
+				"GitHub.vscode-github-actions"
 			]
 		}
 	},
