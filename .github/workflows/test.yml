@@ -32,4 +32,4 @@ jobs:
         run: npm run build
 
       - name: Run e2e tests
-        run: npm run test:e2e
+        run: npx playwright install --with-deps && npm run test:e2e
