@@ -498,6 +498,343 @@ export type Database = {
           },
         ]
       }
+      notification_deliveries: {
+        Row: {
+          attempts: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          error_message: string | null
+          failed_at: string | null
+          id: number
+          last_attempt_at: string | null
+          metadata: Json
+          provider: string | null
+          provider_message_id: string | null
+          recipient_id: number
+          sent_at: string | null
+          status: Database["public"]["Enums"]["notification_delivery_status"]
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          error_message?: string | null
+          failed_at?: string | null
+          id?: never
+          last_attempt_at?: string | null
+          metadata?: Json
+          provider?: string | null
+          provider_message_id?: string | null
+          recipient_id: number
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_delivery_status"]
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          error_message?: string | null
+          failed_at?: string | null
+          id?: never
+          last_attempt_at?: string | null
+          metadata?: Json
+          provider?: string | null
+          provider_message_id?: string | null
+          recipient_id?: number
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_delivery_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "notification_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_digests: {
+        Row: {
+          account_id: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          frequency: Database["public"]["Enums"]["notification_frequency"]
+          id: number
+          recipient_id: number
+          scheduled_for: string
+          sent_at: string | null
+        }
+        Insert: {
+          account_id: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          frequency: Database["public"]["Enums"]["notification_frequency"]
+          id?: never
+          recipient_id: number
+          scheduled_for: string
+          sent_at?: string | null
+        }
+        Update: {
+          account_id?: number
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          frequency?: Database["public"]["Enums"]["notification_frequency"]
+          id?: never
+          recipient_id?: number
+          scheduled_for?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_digests_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_digests_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "notification_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_events: {
+        Row: {
+          actor_account_id: number | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: number
+          occurred_at: string
+          organization_id: number | null
+          payload: Json
+          type: string
+        }
+        Insert: {
+          actor_account_id?: number | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: never
+          occurred_at?: string
+          organization_id?: number | null
+          payload?: Json
+          type: string
+        }
+        Update: {
+          actor_account_id?: number | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: never
+          occurred_at?: string
+          organization_id?: number | null
+          payload?: Json
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_events_actor_account_id_fkey"
+            columns: ["actor_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_inbox: {
+        Row: {
+          account_id: number
+          action_url: string | null
+          archived_at: string | null
+          body: string
+          created_at: string
+          group_key: string | null
+          id: number
+          image_url: string | null
+          is_read: boolean
+          read_at: string | null
+          recipient_id: number
+          title: string
+        }
+        Insert: {
+          account_id: number
+          action_url?: string | null
+          archived_at?: string | null
+          body: string
+          created_at?: string
+          group_key?: string | null
+          id?: never
+          image_url?: string | null
+          is_read?: boolean
+          read_at?: string | null
+          recipient_id: number
+          title: string
+        }
+        Update: {
+          account_id?: number
+          action_url?: string | null
+          archived_at?: string | null
+          body?: string
+          created_at?: string
+          group_key?: string | null
+          id?: never
+          image_url?: string | null
+          is_read?: boolean
+          read_at?: string | null
+          recipient_id?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_inbox_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_inbox_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "notification_recipients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          account_id: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          frequency: Database["public"]["Enums"]["notification_frequency"]
+          id: number
+          is_enabled: boolean
+          notification_type: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: number
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          frequency?: Database["public"]["Enums"]["notification_frequency"]
+          id?: never
+          is_enabled?: boolean
+          notification_type: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: number
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          frequency?: Database["public"]["Enums"]["notification_frequency"]
+          id?: never
+          is_enabled?: boolean
+          notification_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_recipients: {
+        Row: {
+          account_id: number
+          created_at: string
+          event_id: number
+          id: number
+          status: Database["public"]["Enums"]["notification_recipient_status"]
+        }
+        Insert: {
+          account_id: number
+          created_at?: string
+          event_id: number
+          id?: never
+          status?: Database["public"]["Enums"]["notification_recipient_status"]
+        }
+        Update: {
+          account_id?: number
+          created_at?: string
+          event_id?: number
+          id?: never
+          status?: Database["public"]["Enums"]["notification_recipient_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_recipients_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_recipients_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "notification_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_templates: {
+        Row: {
+          body_template: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          id: number
+          is_active: boolean
+          locale: string
+          subject_template: string | null
+          type: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          body_template: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          id?: never
+          is_active?: boolean
+          locale?: string
+          subject_template?: string | null
+          type: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          body_template?: string
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          id?: never
+          is_active?: boolean
+          locale?: string
+          subject_template?: string | null
+          type?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       organization_members: {
         Row: {
           account_id: number
@@ -1388,10 +1725,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      archive_notification: { Args: { p_inbox_id: number }; Returns: undefined }
+      mark_all_notifications_read: { Args: never; Returns: undefined }
+      mark_notification_read: {
+        Args: { p_inbox_id: number }
+        Returns: undefined
+      }
       recompute_entitlements: {
         Args: { p_subscription_id: number }
         Returns: undefined
       }
+      unread_notification_count: { Args: never; Returns: number }
     }
     Enums: {
       billing_interval: "daily" | "weekly" | "monthly" | "yearly"
@@ -1435,6 +1779,30 @@ export type Database = {
       feature_type: "boolean" | "limit" | "metered"
       invoice_status: "draft" | "open" | "paid" | "void" | "uncollectible"
       invoice_type: "subscription" | "one_time" | "credit_note"
+      notification_channel:
+        | "in_app"
+        | "email"
+        | "push"
+        | "sms"
+        | "slack"
+        | "webhook"
+      notification_delivery_status:
+        | "pending"
+        | "queued"
+        | "sent"
+        | "delivered"
+        | "failed"
+        | "cancelled"
+      notification_frequency:
+        | "immediate"
+        | "hourly_digest"
+        | "daily_digest"
+        | "weekly_digest"
+      notification_recipient_status:
+        | "pending"
+        | "processing"
+        | "delivered"
+        | "failed"
       org_member_role: "owner" | "admin" | "member" | "billing"
       payment_behavior:
         | "default_incomplete"
@@ -1632,6 +2000,34 @@ export const Constants = {
       feature_type: ["boolean", "limit", "metered"],
       invoice_status: ["draft", "open", "paid", "void", "uncollectible"],
       invoice_type: ["subscription", "one_time", "credit_note"],
+      notification_channel: [
+        "in_app",
+        "email",
+        "push",
+        "sms",
+        "slack",
+        "webhook",
+      ],
+      notification_delivery_status: [
+        "pending",
+        "queued",
+        "sent",
+        "delivered",
+        "failed",
+        "cancelled",
+      ],
+      notification_frequency: [
+        "immediate",
+        "hourly_digest",
+        "daily_digest",
+        "weekly_digest",
+      ],
+      notification_recipient_status: [
+        "pending",
+        "processing",
+        "delivered",
+        "failed",
+      ],
       org_member_role: ["owner", "admin", "member", "billing"],
       payment_behavior: [
         "default_incomplete",
