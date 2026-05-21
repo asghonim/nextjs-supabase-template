@@ -855,10 +855,12 @@ ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "members can view their organization"
     ON public.organizations FOR SELECT
+    TO authenticated
     USING (private.is_org_member(id));
 
 CREATE POLICY "owner can update organization"
     ON public.organizations FOR UPDATE
+    TO authenticated
     USING (owner_account_id IN (SELECT id FROM public.accounts WHERE user_id = auth.uid()));
 
 -- organization_members
@@ -866,10 +868,12 @@ ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "members can view org roster"
     ON public.organization_members FOR SELECT
+    TO authenticated
     USING (private.is_org_member(organization_id));
 
 CREATE POLICY "admins can manage org membership"
     ON public.organization_members FOR ALL
+    TO authenticated
     USING (private.is_org_admin(organization_id));
 
 -- plans (public catalog — any authenticated user can read)
@@ -877,55 +881,63 @@ ALTER TABLE public.plans ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "authenticated users can read active public plans"
     ON public.plans FOR SELECT
-    USING (auth.uid() IS NOT NULL AND is_active = TRUE);
+    TO authenticated
+    USING (is_active = TRUE);
 
 -- plan_versions
 ALTER TABLE public.plan_versions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "authenticated users can read active plan versions"
     ON public.plan_versions FOR SELECT
-    USING (auth.uid() IS NOT NULL AND is_active = TRUE);
+    TO authenticated
+    USING (is_active = TRUE);
 
 -- features
 ALTER TABLE public.features ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "authenticated users can read active features"
     ON public.features FOR SELECT
-    USING (auth.uid() IS NOT NULL AND is_active = TRUE);
+    TO authenticated
+    USING (is_active = TRUE);
 
 -- plan_feature_entitlements
 ALTER TABLE public.plan_feature_entitlements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "authenticated users can read plan entitlements"
     ON public.plan_feature_entitlements FOR SELECT
-    USING (auth.uid() IS NOT NULL);
+    TO authenticated
+    USING (TRUE);
 
 -- addons
 ALTER TABLE public.addons ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "authenticated users can read active addons"
     ON public.addons FOR SELECT
-    USING (auth.uid() IS NOT NULL AND is_active = TRUE);
+    TO authenticated
+    USING (is_active = TRUE);
 
 -- addon_versions
 ALTER TABLE public.addon_versions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "authenticated users can read active addon versions"
     ON public.addon_versions FOR SELECT
-    USING (auth.uid() IS NOT NULL AND is_active = TRUE);
+    TO authenticated
+    USING (is_active = TRUE);
 
 -- addon_feature_entitlements
 ALTER TABLE public.addon_feature_entitlements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "authenticated users can read addon entitlements"
     ON public.addon_feature_entitlements FOR SELECT
-    USING (auth.uid() IS NOT NULL);
+    TO authenticated
+    USING (TRUE);
 
 -- subscriptions
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view subscriptions"
     ON public.subscriptions FOR SELECT
+    TO authenticated
     USING (private.is_org_billing(organization_id));
 
 -- subscription_addons
@@ -933,6 +945,7 @@ ALTER TABLE public.subscription_addons ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view subscription addons"
     ON public.subscription_addons FOR SELECT
+    TO authenticated
     USING (
         EXISTS (
             SELECT 1 FROM public.subscriptions s
@@ -946,10 +959,12 @@ ALTER TABLE public.subscription_change_requests ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view change requests"
     ON public.subscription_change_requests FOR SELECT
+    TO authenticated
     USING (private.is_org_billing(organization_id));
 
 CREATE POLICY "billing role can create change requests"
     ON public.subscription_change_requests FOR INSERT
+    TO authenticated
     WITH CHECK (
         private.is_org_billing(organization_id)
         AND requested_by_account_id IN (SELECT id FROM public.accounts WHERE user_id = auth.uid())
@@ -960,6 +975,7 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view invoices"
     ON public.invoices FOR SELECT
+    TO authenticated
     USING (private.is_org_billing(organization_id));
 
 -- invoice_line_items
@@ -967,6 +983,7 @@ ALTER TABLE public.invoice_line_items ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view invoice line items"
     ON public.invoice_line_items FOR SELECT
+    TO authenticated
     USING (
         EXISTS (
             SELECT 1 FROM public.invoices i
@@ -980,6 +997,7 @@ ALTER TABLE public.credit_notes ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view credit notes"
     ON public.credit_notes FOR SELECT
+    TO authenticated
     USING (private.is_org_billing(organization_id));
 
 -- payments
@@ -987,6 +1005,7 @@ ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view payments"
     ON public.payments FOR SELECT
+    TO authenticated
     USING (private.is_org_billing(organization_id));
 
 -- subscription_entitlements
@@ -994,6 +1013,7 @@ ALTER TABLE public.subscription_entitlements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "org members can read their entitlements"
     ON public.subscription_entitlements FOR SELECT
+    TO authenticated
     USING (private.is_org_member(organization_id));
 
 -- usage_records
@@ -1001,6 +1021,7 @@ ALTER TABLE public.usage_records ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "org members can view usage records"
     ON public.usage_records FOR SELECT
+    TO authenticated
     USING (private.is_org_member(organization_id));
 
 -- usage_summaries
@@ -1008,6 +1029,7 @@ ALTER TABLE public.usage_summaries ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "org members can view usage summaries"
     ON public.usage_summaries FOR SELECT
+    TO authenticated
     USING (private.is_org_member(organization_id));
 
 -- subscription_events
@@ -1015,6 +1037,7 @@ ALTER TABLE public.subscription_events ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view subscription events"
     ON public.subscription_events FOR SELECT
+    TO authenticated
     USING (private.is_org_billing(organization_id));
 
 -- subscription_contracts
@@ -1022,6 +1045,7 @@ ALTER TABLE public.subscription_contracts ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "billing role can view contracts"
     ON public.subscription_contracts FOR SELECT
+    TO authenticated
     USING (private.is_org_billing(organization_id));
 
 

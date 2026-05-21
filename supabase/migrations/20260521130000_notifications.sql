@@ -304,6 +304,7 @@ ALTER TABLE public.notification_events ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users can view notification events addressed to them"
     ON public.notification_events FOR SELECT
+    TO authenticated
     USING (
         EXISTS (
             SELECT 1 FROM public.notification_recipients nr
@@ -315,6 +316,7 @@ CREATE POLICY "users can view notification events addressed to them"
 
 CREATE POLICY "org members can view their org notification events"
     ON public.notification_events FOR SELECT
+    TO authenticated
     USING (
         organization_id IS NOT NULL
         AND private.is_org_member(organization_id)
@@ -325,6 +327,7 @@ ALTER TABLE public.notification_recipients ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users can view their own recipient records"
     ON public.notification_recipients FOR SELECT
+    TO authenticated
     USING (private.owns_account(account_id));
 
 -- notification_inbox
@@ -332,10 +335,12 @@ ALTER TABLE public.notification_inbox ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users can view their own inbox"
     ON public.notification_inbox FOR SELECT
+    TO authenticated
     USING (private.owns_account(account_id));
 
 CREATE POLICY "users can update their own inbox items"
     ON public.notification_inbox FOR UPDATE
+    TO authenticated
     USING (private.owns_account(account_id))
     WITH CHECK (private.owns_account(account_id));
 
@@ -344,6 +349,7 @@ ALTER TABLE public.notification_deliveries ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users can view their own delivery records"
     ON public.notification_deliveries FOR SELECT
+    TO authenticated
     USING (
         EXISTS (
             SELECT 1 FROM public.notification_recipients nr
@@ -357,6 +363,7 @@ ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users can manage their own preferences"
     ON public.notification_preferences FOR ALL
+    TO authenticated
     USING    (private.owns_account(account_id))
     WITH CHECK (private.owns_account(account_id));
 
@@ -365,13 +372,15 @@ ALTER TABLE public.notification_templates ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "authenticated users can read active templates"
     ON public.notification_templates FOR SELECT
-    USING (auth.uid() IS NOT NULL AND is_active = TRUE);
+    TO authenticated
+    USING (is_active = TRUE);
 
 -- notification_digests
 ALTER TABLE public.notification_digests ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users can view their own digest queue"
     ON public.notification_digests FOR SELECT
+    TO authenticated
     USING (private.owns_account(account_id));
 
 
