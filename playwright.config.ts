@@ -16,7 +16,7 @@ export default defineConfig({
   globalSetup: require.resolve('./tests/init.ts'),
   testDir,
   fullyParallel: true,
-  testIgnore: 'tests/init.ts',
+  testIgnore: ['tests/init.ts', 'tests/*.test.ts'],
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
   workers: process.env.CI ? 1 : 1,
@@ -48,7 +48,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'sh ./tests/init.sh',
+    command: 'npm run dev',
     url: process.env.NEXT_PUBLIC_APP_URL,
     reuseExistingServer: true,
   },

@@ -6,8 +6,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
-  title: 'App',
-  description: 'App Description',
+  title: 'Next.js + Supabase Starter Template',
+  description: 'Next.js + Supabase Starter Template',
 }
 
 export const viewport: Viewport = {

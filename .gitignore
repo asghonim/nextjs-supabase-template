@@ -141,3 +141,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+*.feature.spec.js
+!.env.test
+playwright-report
+test-results
