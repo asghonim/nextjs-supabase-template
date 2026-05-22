@@ -192,10 +192,8 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE public.organizations (
     id                           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name                         TEXT        NOT NULL,
     slug                         TEXT        NOT NULL UNIQUE,
     owner_account_id             BIGINT      NOT NULL REFERENCES public.accounts(id) ON DELETE RESTRICT,
-    billing_email                TEXT,
     billing_provider             public.billing_provider,
     billing_provider_customer_id TEXT        UNIQUE,
     metadata                     JSONB       NOT NULL DEFAULT '{}',
@@ -209,11 +207,42 @@ CREATE INDEX idx_organizations_billing_customer
     ON public.organizations(billing_provider_customer_id)
     WHERE billing_provider_customer_id IS NOT NULL;
 
-CREATE OR REPLACE FUNCTION private.on_organization_updated()       
+CREATE OR REPLACE FUNCTION private.on_update_organization()       
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
 CREATE TRIGGER on_organization_updated
     BEFORE UPDATE ON public.organizations
-    FOR EACH ROW EXECUTE FUNCTION private.on_organization_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_organization();
+CREATE OR REPLACE FUNCTION private.on_insert_organizations()                
+    RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_organizations_inserted                
+    BEFORE INSERT ON public.organizations                
+    FOR EACH ROW EXECUTE FUNCTION private.on_insert_organizations();
+
+CREATE TABLE public.organization_names (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    organization_id BIGINT NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    name            TEXT    NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_organization_names_org ON public.organization_names(organization_id);
+CREATE OR REPLACE FUNCTION private.on_insert_organization_names()                
+    RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_organization_names_inserted                
+    BEFORE INSERT ON public.organization_names                FOR EACH
+    ROW EXECUTE FUNCTION private.on_insert_organization_names();
+
+CREATE TABLE public.organization_billing_emails (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    organization_id BIGINT NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    billing_email   TEXT    NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_organization_billing_emails_org ON public.organization_billing_emails(organization_id);
+CREATE OR REPLACE FUNCTION private.on_insert_organization_billing_emails()                
+    RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_organization_billing_emails_inserted                
+    BEFORE INSERT ON public.organization_billing_emails 
+    FOR EACH ROW EXECUTE FUNCTION private.on_insert_organization_billing_emails();
 
 CREATE TABLE public.organization_members (
     id                 BIGINT                 GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -228,6 +257,9 @@ CREATE TABLE public.organization_members (
 
 CREATE INDEX idx_org_members_account ON public.organization_members(account_id);
 CREATE INDEX idx_org_members_org  ON public.organization_members(organization_id);
+CREATE OR REPLACE FUNCTION private.on_insert_organization_members()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_organization_members_inserted   BEFORE INSERT ON public.organization_members         FOR EACH ROW EXECUTE FUNCTION private.on_insert_organization_members();
 
 CREATE TABLE public.features (
     id          BIGINT               GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -241,11 +273,14 @@ CREATE TABLE public.features (
     updated_at  TIMESTAMPTZ          NOT NULL DEFAULT NOW()
 );
 
-CREATE OR REPLACE FUNCTION private.on_feature_updated()            
+CREATE OR REPLACE FUNCTION private.on_update_feature()            
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
 CREATE TRIGGER on_feature_updated
     BEFORE UPDATE ON public.features
-    FOR EACH ROW EXECUTE FUNCTION private.on_feature_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_feature();
+CREATE OR REPLACE FUNCTION private.on_insert_features()     
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_features_inserted BEFORE INSERT ON public.features                     FOR EACH ROW EXECUTE FUNCTION private.on_insert_features();
 
 CREATE TABLE public.plans (
     id          BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -260,11 +295,14 @@ CREATE TABLE public.plans (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE OR REPLACE FUNCTION private.on_plan_updated()
+CREATE OR REPLACE FUNCTION private.on_update_plan()
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
 CREATE TRIGGER on_plan_updated
     BEFORE UPDATE ON public.plans
-    FOR EACH ROW EXECUTE FUNCTION private.on_plan_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_plan();
+CREATE OR REPLACE FUNCTION private.on_insert_plans()        
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_plans_inserted  BEFORE INSERT ON public.plans                        FOR EACH ROW EXECUTE FUNCTION private.on_insert_plans();
 
 
 -- Versioned pricing — create a new version when pricing changes so
@@ -293,6 +331,9 @@ CREATE INDEX idx_plan_versions_plan
 CREATE INDEX idx_plan_versions_provider_price
     ON public.plan_versions(billing_provider_price_id)
     WHERE billing_provider_price_id IS NOT NULL;
+CREATE OR REPLACE FUNCTION private.on_insert_plan_versions()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_plan_versions_inserted   BEFORE INSERT ON public.plan_versions                FOR EACH ROW EXECUTE FUNCTION private.on_insert_plan_versions();
 
 CREATE TABLE public.plan_feature_entitlements (
     id              BIGINT                      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -307,6 +348,8 @@ CREATE TABLE public.plan_feature_entitlements (
 
 CREATE INDEX idx_plan_feature_entitlements_version
     ON public.plan_feature_entitlements(plan_version_id);
+CREATE OR REPLACE FUNCTION private.on_insert_plan_feature_entitlements()    RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_plan_feature_entitlements_inserted    BEFORE INSERT ON public.plan_feature_entitlements    FOR EACH ROW EXECUTE FUNCTION private.on_insert_plan_feature_entitlements();
 
 CREATE TABLE public.addons (
     id          BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -318,11 +361,14 @@ CREATE TABLE public.addons (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE OR REPLACE FUNCTION private.on_addon_updated()
+CREATE OR REPLACE FUNCTION private.on_update_addon()
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_addon_updated
+CREATE TRIGGER on_update_addon
     BEFORE UPDATE ON public.addons
-    FOR EACH ROW EXECUTE FUNCTION private.on_addon_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_addon();
+CREATE OR REPLACE FUNCTION private.on_insert_addons()       
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_addons_inserted BEFORE INSERT ON public.addons                       FOR EACH ROW EXECUTE FUNCTION private.on_insert_addons();
 
 CREATE TABLE public.addon_versions (
     id                        BIGINT                  GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -337,6 +383,9 @@ CREATE TABLE public.addon_versions (
 );
 
 CREATE INDEX idx_addon_versions_addon ON public.addon_versions(addon_id);
+CREATE OR REPLACE FUNCTION private.on_insert_addon_versions()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_addon_versions_inserted  BEFORE INSERT ON public.addon_versions               FOR EACH ROW EXECUTE FUNCTION private.on_insert_addon_versions();
 
 CREATE TABLE public.addon_feature_entitlements (
     id               BIGINT                      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -351,6 +400,8 @@ CREATE TABLE public.addon_feature_entitlements (
 
 CREATE INDEX idx_addon_feature_entitlements_version
     ON public.addon_feature_entitlements(addon_version_id);
+CREATE OR REPLACE FUNCTION private.on_insert_addon_feature_entitlements()   RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_addon_feature_entitlements_inserted   BEFORE INSERT ON public.addon_feature_entitlements   FOR EACH ROW EXECUTE FUNCTION private.on_insert_addon_feature_entitlements();
 
 
 CREATE TABLE public.subscriptions (
@@ -385,11 +436,14 @@ CREATE INDEX idx_subscriptions_period_end
     ON public.subscriptions(current_period_end)
     WHERE status = 'active';
 
-CREATE OR REPLACE FUNCTION private.on_subscription_updated()
+CREATE OR REPLACE FUNCTION private.on_update_subscription()
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_subscription_updated
+CREATE TRIGGER on_update_subscription
     BEFORE UPDATE ON public.subscriptions
-    FOR EACH ROW EXECUTE FUNCTION private.on_subscription_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_subscription();
+CREATE OR REPLACE FUNCTION private.on_insert_subscriptions()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_subscriptions_inserted   BEFORE INSERT ON public.subscriptions                FOR EACH ROW EXECUTE FUNCTION private.on_insert_subscriptions();
 
 CREATE TABLE public.subscription_addons (
     id                                    BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -407,11 +461,14 @@ CREATE TABLE public.subscription_addons (
 CREATE INDEX idx_subscription_addons_subscription
     ON public.subscription_addons(subscription_id);
 
-CREATE OR REPLACE FUNCTION private.on_subscription_addon_updated() 
+CREATE OR REPLACE FUNCTION private.on_update_subscription_addon() 
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_subscription_addon_updated
+CREATE TRIGGER on_update_subscription_addon
     BEFORE UPDATE ON public.subscription_addons
-    FOR EACH ROW EXECUTE FUNCTION private.on_subscription_addon_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_subscription_addon();
+CREATE OR REPLACE FUNCTION private.on_insert_subscription_addons()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_subscription_addons_inserted    BEFORE INSERT ON public.subscription_addons          FOR EACH ROW EXECUTE FUNCTION private.on_insert_subscription_addons();
 
 
 -- ================================================================
@@ -460,6 +517,8 @@ CREATE INDEX idx_change_requests_status
 CREATE INDEX idx_change_requests_expires
     ON public.subscription_change_requests(expires_at)
     WHERE status IN ('pending', 'processing', 'awaiting_payment');
+CREATE OR REPLACE FUNCTION private.on_insert_subscription_change_requests() RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_subscription_change_requests_inserted BEFORE INSERT ON public.subscription_change_requests FOR EACH ROW EXECUTE FUNCTION private.on_insert_subscription_change_requests();
 
 
 -- ================================================================
@@ -516,11 +575,14 @@ CREATE INDEX idx_invoices_provider_id
 CREATE INDEX idx_invoices_period
     ON public.invoices(organization_id, period_start, period_end);
 
-CREATE OR REPLACE FUNCTION private.on_invoice_updated()
+CREATE OR REPLACE FUNCTION private.on_update_invoice()
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_invoice_updated
+CREATE TRIGGER on_update_invoice
     BEFORE UPDATE ON public.invoices
-    FOR EACH ROW EXECUTE FUNCTION private.on_invoice_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_invoice();
+CREATE OR REPLACE FUNCTION private.on_insert_invoices()     
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_invoices_inserted BEFORE INSERT ON public.invoices                     FOR EACH ROW EXECUTE FUNCTION private.on_insert_invoices();
 
 
 CREATE TABLE public.invoice_line_items (
@@ -543,6 +605,9 @@ CREATE TABLE public.invoice_line_items (
 
 CREATE INDEX idx_invoice_line_items_invoice
     ON public.invoice_line_items(invoice_id);
+CREATE OR REPLACE FUNCTION private.on_insert_invoice_line_items()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_invoice_line_items_inserted BEFORE INSERT ON public.invoice_line_items           FOR EACH ROW EXECUTE FUNCTION private.on_insert_invoice_line_items();
 
 
 -- Credit notes adjust invoices without mutating them.
@@ -562,6 +627,9 @@ CREATE TABLE public.credit_notes (
 
 CREATE INDEX idx_credit_notes_invoice ON public.credit_notes(invoice_id);
 CREATE INDEX idx_credit_notes_org     ON public.credit_notes(organization_id);
+CREATE OR REPLACE FUNCTION private.on_insert_credit_notes() 
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_credit_notes_inserted BEFORE INSERT ON public.credit_notes                 FOR EACH ROW EXECUTE FUNCTION private.on_insert_credit_notes();
 
 CREATE TABLE public.payments (
     id                                 BIGINT                  GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -593,11 +661,14 @@ CREATE INDEX idx_payments_provider_id
     ON public.payments(billing_provider_payment_id)
     WHERE billing_provider_payment_id IS NOT NULL;
 
-CREATE OR REPLACE FUNCTION private.on_payment_updated()
+CREATE OR REPLACE FUNCTION private.on_update_payment()
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_payment_updated
+CREATE TRIGGER on_update_payment
     BEFORE UPDATE ON public.payments
-    FOR EACH ROW EXECUTE FUNCTION private.on_payment_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_payment();
+CREATE OR REPLACE FUNCTION private.on_insert_payments()     
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_payments_inserted BEFORE INSERT ON public.payments                     FOR EACH ROW EXECUTE FUNCTION private.on_insert_payments();
 
 
 -- ================================================================
@@ -628,6 +699,8 @@ CREATE INDEX idx_entitlements_org_feature
     ON public.subscription_entitlements(organization_id, feature_key);
 CREATE INDEX idx_entitlements_subscription
     ON public.subscription_entitlements(subscription_id);
+CREATE OR REPLACE FUNCTION private.on_insert_subscription_entitlements()    RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_subscription_entitlements_inserted    BEFORE INSERT ON public.subscription_entitlements    FOR EACH ROW EXECUTE FUNCTION private.on_insert_subscription_entitlements();
 
 -- One row per discrete usage event. idempotency_key prevents
 -- double-counting on retries / at-least-once delivery.
@@ -650,6 +723,9 @@ CREATE INDEX idx_usage_records_org_feature_period
     ON public.usage_records(organization_id, feature_key, period_start, period_end);
 CREATE INDEX idx_usage_records_subscription
     ON public.usage_records(subscription_id, recorded_at);
+CREATE OR REPLACE FUNCTION private.on_insert_usage_records()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_usage_records_inserted   BEFORE INSERT ON public.usage_records                FOR EACH ROW EXECUTE FUNCTION private.on_insert_usage_records();
 
 
 -- Aggregated per billing period — maintained by trigger so
@@ -672,6 +748,9 @@ CREATE INDEX idx_usage_summaries_org_feature
     ON public.usage_summaries(organization_id, feature_key);
 CREATE INDEX idx_usage_summaries_subscription_period
     ON public.usage_summaries(subscription_id, period_start);
+CREATE OR REPLACE FUNCTION private.on_insert_usage_summaries()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_usage_summaries_inserted BEFORE INSERT ON public.usage_summaries              FOR EACH ROW EXECUTE FUNCTION private.on_insert_usage_summaries();
 
 
 CREATE OR REPLACE FUNCTION private.update_usage_summary()
@@ -721,6 +800,9 @@ CREATE INDEX idx_subscription_events_subscription
     ON public.subscription_events(subscription_id);
 CREATE INDEX idx_subscription_events_type
     ON public.subscription_events(type, occurred_at DESC);
+CREATE OR REPLACE FUNCTION private.on_insert_subscription_events()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_subscription_events_inserted    BEFORE INSERT ON public.subscription_events          FOR EACH ROW EXECUTE FUNCTION private.on_insert_subscription_events();
 
 
 -- ================================================================
@@ -749,6 +831,9 @@ CREATE INDEX idx_webhook_events_status
     ON public.billing_webhook_events(status, created_at);
 CREATE INDEX idx_webhook_events_provider_type
     ON public.billing_webhook_events(billing_provider, event_type);
+CREATE OR REPLACE FUNCTION private.on_insert_billing_webhook_events()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_billing_webhook_events_inserted BEFORE INSERT ON public.billing_webhook_events       FOR EACH ROW EXECUTE FUNCTION private.on_insert_billing_webhook_events();
 
 
 -- ================================================================
@@ -771,6 +856,9 @@ CREATE TABLE public.idempotency_keys (
 
 CREATE INDEX idx_idempotency_keys_expires
     ON public.idempotency_keys(expires_at);
+CREATE OR REPLACE FUNCTION private.on_insert_idempotency_keys()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_idempotency_keys_inserted BEFORE INSERT ON public.idempotency_keys             FOR EACH ROW EXECUTE FUNCTION private.on_insert_idempotency_keys();
 
 
 -- ================================================================
@@ -799,11 +887,14 @@ CREATE INDEX idx_contracts_org
 CREATE INDEX idx_contracts_subscription
     ON public.subscription_contracts(subscription_id);
 
-CREATE OR REPLACE FUNCTION private.on_subscription_contract_updated() 
+CREATE OR REPLACE FUNCTION private.on_update_subscription_contract() 
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_subscription_contract_updated
+CREATE TRIGGER on_update_subscription_contract
     BEFORE UPDATE ON public.subscription_contracts
-    FOR EACH ROW EXECUTE FUNCTION private.on_subscription_contract_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_subscription_contract();
+CREATE OR REPLACE FUNCTION private.on_insert_subscription_contracts()
+	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_subscription_contracts_inserted BEFORE INSERT ON public.subscription_contracts       FOR EACH ROW EXECUTE FUNCTION private.on_insert_subscription_contracts();
 
 
 -- ================================================================
@@ -853,25 +944,32 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE;
 -- organizations
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "members can view their organization"
+CREATE POLICY "Allow members to view their organization"
     ON public.organizations FOR SELECT
     TO authenticated
     USING (private.is_org_member(id));
 
-CREATE POLICY "owner can update organization"
-    ON public.organizations FOR UPDATE
+ALTER TABLE public.organization_names ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow owner to insert organization name"
+    ON public.organization_names FOR INSERT
     TO authenticated
-    USING (owner_account_id IN (SELECT id FROM public.accounts WHERE user_id = auth.uid()));
+    WITH CHECK (exists(SELECT 1 FROM public.organizations o WHERE o.id = organization_id AND private.is_org_admin(o.id)));
+
+ALTER TABLE public.organization_billing_emails ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow owner to insert billing emails"
+    ON public.organization_billing_emails FOR INSERT
+    TO authenticated
+    WITH CHECK (exists(SELECT 1 FROM public.organizations o WHERE o.id = organization_id AND private.is_org_admin(o.id)));
 
 -- organization_members
 ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "members can view org roster"
+CREATE POLICY "Allow members to view org roster"
     ON public.organization_members FOR SELECT
     TO authenticated
     USING (private.is_org_member(organization_id));
 
-CREATE POLICY "admins can manage org membership"
+CREATE POLICY "Allow admins to manage org membership"
     ON public.organization_members FOR ALL
     TO authenticated
     USING (private.is_org_admin(organization_id));
@@ -879,7 +977,7 @@ CREATE POLICY "admins can manage org membership"
 -- plans (public catalog — any authenticated user can read)
 ALTER TABLE public.plans ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated users can read active public plans"
+CREATE POLICY "Allow authenticated users to read active public plans"
     ON public.plans FOR SELECT
     TO authenticated
     USING (is_active = TRUE);
@@ -887,7 +985,7 @@ CREATE POLICY "authenticated users can read active public plans"
 -- plan_versions
 ALTER TABLE public.plan_versions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated users can read active plan versions"
+CREATE POLICY "Allow authenticated users to read active plan versions"
     ON public.plan_versions FOR SELECT
     TO authenticated
     USING (is_active = TRUE);
@@ -895,7 +993,7 @@ CREATE POLICY "authenticated users can read active plan versions"
 -- features
 ALTER TABLE public.features ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated users can read active features"
+CREATE POLICY "Allow authenticated users to read active features"
     ON public.features FOR SELECT
     TO authenticated
     USING (is_active = TRUE);
@@ -903,7 +1001,7 @@ CREATE POLICY "authenticated users can read active features"
 -- plan_feature_entitlements
 ALTER TABLE public.plan_feature_entitlements ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated users can read plan entitlements"
+CREATE POLICY "Allow authenticated users to read plan entitlements"
     ON public.plan_feature_entitlements FOR SELECT
     TO authenticated
     USING (TRUE);
@@ -911,7 +1009,7 @@ CREATE POLICY "authenticated users can read plan entitlements"
 -- addons
 ALTER TABLE public.addons ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated users can read active addons"
+CREATE POLICY "Allow authenticated users to read active addons"
     ON public.addons FOR SELECT
     TO authenticated
     USING (is_active = TRUE);
@@ -919,7 +1017,7 @@ CREATE POLICY "authenticated users can read active addons"
 -- addon_versions
 ALTER TABLE public.addon_versions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated users can read active addon versions"
+CREATE POLICY "Allow authenticated users to read active addon versions"
     ON public.addon_versions FOR SELECT
     TO authenticated
     USING (is_active = TRUE);
@@ -927,7 +1025,7 @@ CREATE POLICY "authenticated users can read active addon versions"
 -- addon_feature_entitlements
 ALTER TABLE public.addon_feature_entitlements ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated users can read addon entitlements"
+CREATE POLICY "Allow authenticated users to read addon entitlements"
     ON public.addon_feature_entitlements FOR SELECT
     TO authenticated
     USING (TRUE);
@@ -935,7 +1033,7 @@ CREATE POLICY "authenticated users can read addon entitlements"
 -- subscriptions
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view subscriptions"
+CREATE POLICY "Allow billing role to view subscriptions"
     ON public.subscriptions FOR SELECT
     TO authenticated
     USING (private.is_org_billing(organization_id));
@@ -943,7 +1041,7 @@ CREATE POLICY "billing role can view subscriptions"
 -- subscription_addons
 ALTER TABLE public.subscription_addons ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view subscription addons"
+CREATE POLICY "Allow billing role to view subscription addons"
     ON public.subscription_addons FOR SELECT
     TO authenticated
     USING (
@@ -957,12 +1055,12 @@ CREATE POLICY "billing role can view subscription addons"
 -- subscription_change_requests
 ALTER TABLE public.subscription_change_requests ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view change requests"
+CREATE POLICY "Allow billing role to view change requests"
     ON public.subscription_change_requests FOR SELECT
     TO authenticated
     USING (private.is_org_billing(organization_id));
 
-CREATE POLICY "billing role can create change requests"
+CREATE POLICY "Allow billing role to create change requests"
     ON public.subscription_change_requests FOR INSERT
     TO authenticated
     WITH CHECK (
@@ -973,7 +1071,7 @@ CREATE POLICY "billing role can create change requests"
 -- invoices
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view invoices"
+CREATE POLICY "Allow billing role to view invoices"
     ON public.invoices FOR SELECT
     TO authenticated
     USING (private.is_org_billing(organization_id));
@@ -981,7 +1079,7 @@ CREATE POLICY "billing role can view invoices"
 -- invoice_line_items
 ALTER TABLE public.invoice_line_items ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view invoice line items"
+CREATE POLICY "Allow billing role to view invoice line items"
     ON public.invoice_line_items FOR SELECT
     TO authenticated
     USING (
@@ -995,7 +1093,7 @@ CREATE POLICY "billing role can view invoice line items"
 -- credit_notes
 ALTER TABLE public.credit_notes ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view credit notes"
+CREATE POLICY "Allow billing role to view credit notes"
     ON public.credit_notes FOR SELECT
     TO authenticated
     USING (private.is_org_billing(organization_id));
@@ -1003,7 +1101,7 @@ CREATE POLICY "billing role can view credit notes"
 -- payments
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view payments"
+CREATE POLICY "Allow billing role to view payments"
     ON public.payments FOR SELECT
     TO authenticated
     USING (private.is_org_billing(organization_id));
@@ -1011,7 +1109,7 @@ CREATE POLICY "billing role can view payments"
 -- subscription_entitlements
 ALTER TABLE public.subscription_entitlements ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "org members can read their entitlements"
+CREATE POLICY "Allow org members to read their entitlements"
     ON public.subscription_entitlements FOR SELECT
     TO authenticated
     USING (private.is_org_member(organization_id));
@@ -1019,7 +1117,7 @@ CREATE POLICY "org members can read their entitlements"
 -- usage_records
 ALTER TABLE public.usage_records ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "org members can view usage records"
+CREATE POLICY "Allow org members to view usage records"
     ON public.usage_records FOR SELECT
     TO authenticated
     USING (private.is_org_member(organization_id));
@@ -1027,7 +1125,7 @@ CREATE POLICY "org members can view usage records"
 -- usage_summaries
 ALTER TABLE public.usage_summaries ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "org members can view usage summaries"
+CREATE POLICY "Allow org members to view usage summaries"
     ON public.usage_summaries FOR SELECT
     TO authenticated
     USING (private.is_org_member(organization_id));
@@ -1035,7 +1133,7 @@ CREATE POLICY "org members can view usage summaries"
 -- subscription_events
 ALTER TABLE public.subscription_events ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view subscription events"
+CREATE POLICY "Allow billing role to view subscription events"
     ON public.subscription_events FOR SELECT
     TO authenticated
     USING (private.is_org_billing(organization_id));
@@ -1043,7 +1141,7 @@ CREATE POLICY "billing role can view subscription events"
 -- subscription_contracts
 ALTER TABLE public.subscription_contracts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "billing role can view contracts"
+CREATE POLICY "Allow billing role to view contracts"
     ON public.subscription_contracts FOR SELECT
     TO authenticated
     USING (private.is_org_billing(organization_id));

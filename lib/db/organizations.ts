@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
 type OrgInsert = Database['public']['Tables']['organizations']['Insert']
-type OrgUpdate = Database['public']['Tables']['organizations']['Update']
 type MemberRole = Database['public']['Enums']['org_member_role']
 
 export function createOrganizationsDb(supabase: SupabaseClient<Database>) {
@@ -39,11 +38,18 @@ export function createOrganizationsDb(supabase: SupabaseClient<Database>) {
         .single()
     },
 
-    update(id: number, data: OrgUpdate) {
+    createOrganizationName(orgId: number, name: string) {
       return supabase
-        .from('organizations')
-        .update(data)
-        .eq('id', id)
+        .from('organization_names')
+        .insert({ organization_id: orgId, name })
+        .select()
+        .single()
+    },
+
+    createOrganizationBillingEmail(orgId: number, billingEmail: string) {
+      return supabase
+        .from('organization_billing_emails')
+        .insert({ organization_id: orgId, billing_email: billingEmail })
         .select()
         .single()
     },

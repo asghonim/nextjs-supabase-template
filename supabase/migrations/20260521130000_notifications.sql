@@ -88,6 +88,9 @@ CREATE INDEX idx_notification_events_entity
 CREATE INDEX idx_notification_events_actor
     ON public.notification_events(actor_account_id)
     WHERE actor_account_id IS NOT NULL;
+CREATE OR REPLACE FUNCTION private.on_insert_notification_events()      RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_notification_events_inserted      BEFORE INSERT ON public.notification_events
+	FOR EACH ROW EXECUTE FUNCTION private.on_insert_notification_events();
 
 
 -- ================================================================
@@ -111,6 +114,8 @@ CREATE INDEX idx_notification_recipients_event
     ON public.notification_recipients(event_id);
 CREATE INDEX idx_notification_recipients_account
     ON public.notification_recipients(account_id, created_at DESC);
+CREATE OR REPLACE FUNCTION private.on_insert_notification_recipients()  RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_notification_recipients_inserted  BEFORE INSERT ON public.notification_recipients  FOR EACH ROW EXECUTE FUNCTION private.on_insert_notification_recipients();
 
 
 -- ================================================================
@@ -149,6 +154,9 @@ CREATE INDEX idx_notification_inbox_group
     WHERE group_key IS NOT NULL;
 CREATE INDEX idx_notification_inbox_recipient
     ON public.notification_inbox(recipient_id);
+CREATE OR REPLACE FUNCTION private.on_insert_notification_inbox()       RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_notification_inbox_inserted       BEFORE INSERT ON public.notification_inbox
+	FOR EACH ROW EXECUTE FUNCTION private.on_insert_notification_inbox();
 
 
 -- ================================================================
@@ -183,11 +191,13 @@ CREATE INDEX idx_notification_deliveries_pending
 CREATE INDEX idx_notification_deliveries_channel_status
     ON public.notification_deliveries(channel, status);
 
-CREATE OR REPLACE FUNCTION private.on_notification_delivery_updated()
+CREATE OR REPLACE FUNCTION private.on_update_notification_delivery()
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_notification_delivery_updated
+CREATE TRIGGER on_update_notification_delivery
     BEFORE UPDATE ON public.notification_deliveries
-    FOR EACH ROW EXECUTE FUNCTION private.on_notification_delivery_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_notification_delivery();
+CREATE OR REPLACE FUNCTION private.on_insert_notification_deliveries()  RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_notification_deliveries_inserted  BEFORE INSERT ON public.notification_deliveries  FOR EACH ROW EXECUTE FUNCTION private.on_insert_notification_deliveries();
 
 
 -- ================================================================
@@ -214,11 +224,13 @@ CREATE INDEX idx_notification_preferences_account
 CREATE INDEX idx_notification_preferences_type
     ON public.notification_preferences(notification_type, channel);
 
-CREATE OR REPLACE FUNCTION private.on_notification_preference_updated()
+CREATE OR REPLACE FUNCTION private.on_update_notification_preference()
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_notification_preference_updated
+CREATE TRIGGER on_update_notification_preference
     BEFORE UPDATE ON public.notification_preferences
-    FOR EACH ROW EXECUTE FUNCTION private.on_notification_preference_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_notification_preference();
+CREATE OR REPLACE FUNCTION private.on_insert_notification_preferences() RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_notification_preferences_inserted BEFORE INSERT ON public.notification_preferences FOR EACH ROW EXECUTE FUNCTION private.on_insert_notification_preferences();
 
 
 -- ================================================================
@@ -247,11 +259,13 @@ CREATE INDEX idx_notification_templates_lookup
     ON public.notification_templates(type, channel, locale)
     WHERE is_active = TRUE;
 
-CREATE OR REPLACE FUNCTION private.on_notification_template_updated()
+CREATE OR REPLACE FUNCTION private.on_update_notification_template()
     RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_notification_template_updated
+CREATE TRIGGER on_update_notification_template
     BEFORE UPDATE ON public.notification_templates
-    FOR EACH ROW EXECUTE FUNCTION private.on_notification_template_updated();
+    FOR EACH ROW EXECUTE FUNCTION private.on_update_notification_template();
+CREATE OR REPLACE FUNCTION private.on_insert_notification_templates()   RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_notification_templates_inserted   BEFORE INSERT ON public.notification_templates   FOR EACH ROW EXECUTE FUNCTION private.on_insert_notification_templates();
 
 
 -- ================================================================
@@ -278,6 +292,9 @@ CREATE INDEX idx_notification_digests_account
 CREATE INDEX idx_notification_digests_pending
     ON public.notification_digests(scheduled_for)
     WHERE sent_at IS NULL;
+CREATE OR REPLACE FUNCTION private.on_insert_notification_digests()     RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+CREATE TRIGGER on_notification_digests_inserted     BEFORE INSERT ON public.notification_digests
+	FOR EACH ROW EXECUTE FUNCTION private.on_insert_notification_digests();
 
 
 -- ================================================================
@@ -302,7 +319,7 @@ $$ LANGUAGE sql SECURITY DEFINER STABLE;
 -- Users see events where they are a recipient, OR events for their orgs.
 ALTER TABLE public.notification_events ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "users can view notification events addressed to them"
+CREATE POLICY "Allow users to view notification events addressed to them"
     ON public.notification_events FOR SELECT
     TO authenticated
     USING (
@@ -314,7 +331,7 @@ CREATE POLICY "users can view notification events addressed to them"
         )
     );
 
-CREATE POLICY "org members can view their org notification events"
+CREATE POLICY "Allow org members to view their org notification events"
     ON public.notification_events FOR SELECT
     TO authenticated
     USING (
@@ -325,7 +342,7 @@ CREATE POLICY "org members can view their org notification events"
 -- notification_recipients
 ALTER TABLE public.notification_recipients ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "users can view their own recipient records"
+CREATE POLICY "Allow users to view their own recipient records"
     ON public.notification_recipients FOR SELECT
     TO authenticated
     USING (private.owns_account(account_id));
@@ -333,21 +350,37 @@ CREATE POLICY "users can view their own recipient records"
 -- notification_inbox
 ALTER TABLE public.notification_inbox ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "users can view their own inbox"
+CREATE POLICY "Allow users to view their own inbox"
     ON public.notification_inbox FOR SELECT
     TO authenticated
     USING (private.owns_account(account_id));
 
-CREATE POLICY "users can update their own inbox items"
+CREATE POLICY "Allow users to update their own inbox items"
     ON public.notification_inbox FOR UPDATE
     TO authenticated
     USING (private.owns_account(account_id))
-    WITH CHECK (private.owns_account(account_id));
+    WITH CHECK (
+        private.owns_account(account_id)
+        AND (
+            SELECT
+                ni.id               IS NOT DISTINCT FROM notification_inbox.id
+                AND ni.recipient_id IS NOT DISTINCT FROM notification_inbox.recipient_id
+                AND ni.account_id   IS NOT DISTINCT FROM notification_inbox.account_id
+                AND ni.title        IS NOT DISTINCT FROM notification_inbox.title
+                AND ni.body         IS NOT DISTINCT FROM notification_inbox.body
+                AND ni.image_url    IS NOT DISTINCT FROM notification_inbox.image_url
+                AND ni.action_url   IS NOT DISTINCT FROM notification_inbox.action_url
+                AND ni.group_key    IS NOT DISTINCT FROM notification_inbox.group_key
+                AND ni.created_at   IS NOT DISTINCT FROM notification_inbox.created_at
+            FROM   public.notification_inbox ni
+            WHERE  ni.id = notification_inbox.id
+        )
+    );
 
 -- notification_deliveries
 ALTER TABLE public.notification_deliveries ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "users can view their own delivery records"
+CREATE POLICY "Allow users to view their own delivery records"
     ON public.notification_deliveries FOR SELECT
     TO authenticated
     USING (
@@ -361,7 +394,7 @@ CREATE POLICY "users can view their own delivery records"
 -- notification_preferences
 ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "users can manage their own preferences"
+CREATE POLICY "Allow users to manage their own preferences"
     ON public.notification_preferences FOR ALL
     TO authenticated
     USING    (private.owns_account(account_id))
@@ -370,7 +403,7 @@ CREATE POLICY "users can manage their own preferences"
 -- notification_templates (public catalog — any authenticated user can read)
 ALTER TABLE public.notification_templates ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authenticated users can read active templates"
+CREATE POLICY "Allow authenticated users to read active templates"
     ON public.notification_templates FOR SELECT
     TO authenticated
     USING (is_active = TRUE);
@@ -378,7 +411,7 @@ CREATE POLICY "authenticated users can read active templates"
 -- notification_digests
 ALTER TABLE public.notification_digests ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "users can view their own digest queue"
+CREATE POLICY "Allow users to view their own digest queue"
     ON public.notification_digests FOR SELECT
     TO authenticated
     USING (private.owns_account(account_id));

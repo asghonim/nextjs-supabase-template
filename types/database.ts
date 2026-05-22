@@ -14,6 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_avatars: {
+        Row: {
+          account_id: number
+          created_at: string
+          id: number
+          url: string
+        }
+        Insert: {
+          account_id: number
+          created_at: string
+          id?: never
+          url: string
+        }
+        Update: {
+          account_id?: number
+          created_at?: string
+          id?: never
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_avatars_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_names: {
+        Row: {
+          account_id: number
+          created_at: string
+          id: number
+          name: string
+        }
+        Insert: {
+          account_id: number
+          created_at: string
+          id?: never
+          name: string
+        }
+        Update: {
+          account_id?: number
+          created_at?: string
+          id?: never
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_names_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           created_at: string
@@ -190,6 +248,176 @@ export type Database = {
           processed_at?: string | null
           retry_count?: number
           status?: Database["public"]["Enums"]["webhook_event_status"]
+        }
+        Relationships: []
+      }
+      contact_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          message_id: string | null
+          mime_type: string | null
+          size_bytes: number | null
+          storage_key: string
+          storage_provider: string
+          submission_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          message_id?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_key: string
+          storage_provider?: string
+          submission_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          message_id?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_key?: string
+          storage_provider?: string
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "contact_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_attachments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "contact_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          metadata: Json
+          sender_type: Database["public"]["Enums"]["contact_sender_type"]
+          sender_user_id: string | null
+          submission_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          metadata?: Json
+          sender_type?: Database["public"]["Enums"]["contact_sender_type"]
+          sender_user_id?: string | null
+          submission_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          metadata?: Json
+          sender_type?: Database["public"]["Enums"]["contact_sender_type"]
+          sender_user_id?: string | null
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_messages_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "contact_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_submissions: {
+        Row: {
+          assigned_to_user_id: string | null
+          authenticated_user_id: string | null
+          category: string | null
+          company_name: string | null
+          created_at: string
+          due_at: string | null
+          email: string | null
+          first_response_at: string | null
+          full_name: string | null
+          id: string
+          ip_address: unknown
+          message: string
+          metadata: Json
+          phone: string | null
+          priority: Database["public"]["Enums"]["contact_priority"]
+          referer: string | null
+          resolved_at: string | null
+          source: string | null
+          spam_score: number | null
+          status: Database["public"]["Enums"]["contact_status"]
+          subject: string | null
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          assigned_to_user_id?: string | null
+          authenticated_user_id?: string | null
+          category?: string | null
+          company_name?: string | null
+          created_at?: string
+          due_at?: string | null
+          email?: string | null
+          first_response_at?: string | null
+          full_name?: string | null
+          id?: string
+          ip_address?: unknown
+          message: string
+          metadata?: Json
+          phone?: string | null
+          priority?: Database["public"]["Enums"]["contact_priority"]
+          referer?: string | null
+          resolved_at?: string | null
+          source?: string | null
+          spam_score?: number | null
+          status?: Database["public"]["Enums"]["contact_status"]
+          subject?: string | null
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          assigned_to_user_id?: string | null
+          authenticated_user_id?: string | null
+          category?: string | null
+          company_name?: string | null
+          created_at?: string
+          due_at?: string | null
+          email?: string | null
+          first_response_at?: string | null
+          full_name?: string | null
+          id?: string
+          ip_address?: unknown
+          message?: string
+          metadata?: Json
+          phone?: string | null
+          priority?: Database["public"]["Enums"]["contact_priority"]
+          referer?: string | null
+          resolved_at?: string | null
+          source?: string | null
+          spam_score?: number | null
+          status?: Database["public"]["Enums"]["contact_status"]
+          subject?: string | null
+          updated_at?: string
+          user_agent?: string | null
         }
         Relationships: []
       }
@@ -835,6 +1063,35 @@ export type Database = {
         }
         Relationships: []
       }
+      organization_billing_emails: {
+        Row: {
+          billing_email: string
+          created_at: string
+          id: number
+          organization_id: number
+        }
+        Insert: {
+          billing_email: string
+          created_at?: string
+          id?: never
+          organization_id: number
+        }
+        Update: {
+          billing_email?: string
+          created_at?: string
+          id?: never
+          organization_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_billing_emails_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           account_id: number
@@ -887,9 +1144,37 @@ export type Database = {
           },
         ]
       }
+      organization_names: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          organization_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          name: string
+          organization_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          name?: string
+          organization_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_names_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
-          billing_email: string | null
           billing_provider:
             | Database["public"]["Enums"]["billing_provider"]
             | null
@@ -897,13 +1182,11 @@ export type Database = {
           created_at: string
           id: number
           metadata: Json
-          name: string
           owner_account_id: number
           slug: string
           updated_at: string
         }
         Insert: {
-          billing_email?: string | null
           billing_provider?:
             | Database["public"]["Enums"]["billing_provider"]
             | null
@@ -911,13 +1194,11 @@ export type Database = {
           created_at?: string
           id?: never
           metadata?: Json
-          name: string
           owner_account_id: number
           slug: string
           updated_at?: string
         }
         Update: {
-          billing_email?: string | null
           billing_provider?:
             | Database["public"]["Enums"]["billing_provider"]
             | null
@@ -925,7 +1206,6 @@ export type Database = {
           created_at?: string
           id?: never
           metadata?: Json
-          name?: string
           owner_account_id?: number
           slug?: string
           updated_at?: string
@@ -939,6 +1219,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      outbox_events: {
+        Row: {
+          aggregate_id: string
+          aggregate_type: string
+          created_at: string
+          error: string | null
+          event_type: string
+          id: string
+          payload: Json
+          processed_at: string | null
+        }
+        Insert: {
+          aggregate_id: string
+          aggregate_type: string
+          created_at?: string
+          error?: string | null
+          event_type: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+        }
+        Update: {
+          aggregate_id?: string
+          aggregate_type?: string
+          created_at?: string
+          error?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+        }
+        Relationships: []
       }
       payments: {
         Row: {
@@ -1735,6 +2048,8 @@ export type Database = {
         Args: { p_subscription_id: number }
         Returns: undefined
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       unread_notification_count: { Args: never; Returns: number }
     }
     Enums: {
@@ -1767,6 +2082,16 @@ export type Database = {
         | "remove_seats"
         | "add_addon"
         | "remove_addon"
+      contact_priority: "low" | "normal" | "high" | "urgent"
+      contact_sender_type: "customer" | "agent" | "system"
+      contact_status:
+        | "new"
+        | "reviewed"
+        | "in_progress"
+        | "waiting_customer"
+        | "resolved"
+        | "closed"
+        | "spam"
       contract_status: "draft" | "active" | "expired" | "terminated"
       credit_note_reason:
         | "duplicate"
@@ -1986,6 +2311,17 @@ export const Constants = {
         "remove_seats",
         "add_addon",
         "remove_addon",
+      ],
+      contact_priority: ["low", "normal", "high", "urgent"],
+      contact_sender_type: ["customer", "agent", "system"],
+      contact_status: [
+        "new",
+        "reviewed",
+        "in_progress",
+        "waiting_customer",
+        "resolved",
+        "closed",
+        "spam",
       ],
       contract_status: ["draft", "active", "expired", "terminated"],
       credit_note_reason: [

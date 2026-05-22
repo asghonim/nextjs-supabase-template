@@ -9,6 +9,7 @@ import { createEntitlementsDb } from './entitlements'
 import { createBillingDb } from './billing'
 import { createUsageDb } from './usage'
 import { createNotificationsDb } from './notifications'
+import { createContactDb } from './contact'
 
 export function createDb(supabase: SupabaseClient<Database>) {
   return {
@@ -21,6 +22,7 @@ export function createDb(supabase: SupabaseClient<Database>) {
     billing: createBillingDb(supabase),
     usage: createUsageDb(supabase),
     notifications: createNotificationsDb(supabase),
+    contact: createContactDb(supabase),
   }
 }
 
@@ -35,3 +37,4 @@ export type { EntitlementsDb } from './entitlements'
 export type { BillingDb } from './billing'
 export type { UsageDb } from './usage'
 export type { NotificationsDb } from './notifications'
+export type { ContactDb } from './contact'

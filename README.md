@@ -42,10 +42,16 @@ Copy `.env.local.example` to `.env.local` and fill in your values:
 cp .env.local.example .env.local
 ```
 
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key — used server-side only, never exposed to the browser |
+| `RESEND_API_KEY` | No | [Resend](https://resend.com) API key — contact form email notifications are skipped when absent |
+| `RESEND_FROM_EMAIL` | No | From address for outgoing email, e.g. `Support <support@example.com>` |
+| `CONTACT_NOTIFICATION_EMAIL` | No | Address that receives admin notifications for new contact submissions |
+| `CLOUDFLARE_TURNSTILE_SECRET_KEY` | No | Cloudflare Turnstile secret — CAPTCHA verification is skipped when absent |
+| `NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY` | No | Cloudflare Turnstile site key — the CAPTCHA widget is hidden when absent |
 
 ### Database setup
 
@@ -124,6 +130,14 @@ Three migrations build the schema:
 - `notification_preferences` (per-user opt-in per type × channel)
 - `notification_templates` (versioned content per type × channel × locale)
 - `notification_digests` (batch delivery queue)
+
+**`contact`** — Contact form ticketing system:
+- `contact_submissions` — source of truth for all submissions; status state machine, priority, spam score, IP/browser metadata
+- `contact_messages` — message thread per submission; initial customer message is mirrored here on creation
+- `contact_attachments` — file attachment metadata (files live in object storage)
+- `outbox_events` — transactional outbox; written atomically with each submission so email notifications can be retried if they fail
+
+Default email templates are seeded into `notification_templates` under types `contact_submission.admin_notification` and `contact_submission.auto_response`. Edit those rows to customise content without a code deploy.
 
 All tables have Row Level Security enabled.
 
