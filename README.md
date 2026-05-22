@@ -131,10 +131,11 @@ All tables have Row Level Security enabled.
 
 **Auth middleware** — Session management and route protection live in `lib/supabase/middleware.ts` via `updateSession()`. Unauthenticated users are redirected to `/login`.
 
-**Supabase clients** — Three separate clients for different contexts:
+**Supabase clients** — Four separate clients for different contexts:
 - `lib/supabase/client.ts` — browser (client components, hooks)
 - `lib/supabase/server.ts` — Server Components and Server Actions
 - `lib/supabase/middleware.ts` — session refresh in middleware
+- `lib/supabase/admin.ts` — service role client for API routes that need to bypass RLS (contact form, outbox processor)
 
 **Entitlements** — Call `recompute_entitlements(subscription_id)` after any subscription or addon change. Use `useEntitlements()` / `useHasFeature(featureCode)` in components — never branch on plan names or IDs.
 
