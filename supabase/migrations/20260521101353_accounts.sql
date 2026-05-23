@@ -1,14 +1,48 @@
--- ================================================================
--- ACCOUNT NAMES & AVATARS
---
--- Append-only log of display name and avatar changes per account.
--- created_at is forced to NOW() in a BEFORE INSERT trigger so
--- callers cannot supply a forged timestamp.
--- ================================================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE SCHEMA private;
 
--- ----------------------------------------------------------------
--- Tables
--- ----------------------------------------------------------------
+CREATE TABLE public.accounts (
+    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION private.on_create_account()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    NEW.created_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER on_create_account
+BEFORE UPDATE ON public.accounts
+FOR EACH ROW
+EXECUTE FUNCTION private.on_create_account();
+
+
+CREATE OR REPLACE FUNCTION private.on_auth_user_created()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.accounts (user_id, created_at, updated_at)
+    VALUES (
+        NEW.id,
+        NOW(),
+        NOW()
+    )
+    ON CONFLICT (id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION private.on_auth_user_created();
+
 
 CREATE TABLE public.account_names (
     id          BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -27,10 +61,6 @@ CREATE TABLE public.account_avatars (
 );
 
 CREATE INDEX ON public.account_avatars(account_id, created_at DESC);
-
--- ----------------------------------------------------------------
--- Triggers: force created_at = NOW() on every insert
--- ----------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION private.on_insert_account_name()
 RETURNS TRIGGER AS $$
@@ -56,12 +86,19 @@ CREATE TRIGGER on_insert_account_avatar
 BEFORE INSERT ON public.account_avatars
 FOR EACH ROW EXECUTE FUNCTION private.on_insert_account_avatar();
 
--- ----------------------------------------------------------------
--- Row Level Security
--- ----------------------------------------------------------------
-
 ALTER TABLE public.account_names   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.account_avatars ENABLE ROW LEVEL SECURITY;
+
+
+CREATE OR REPLACE FUNCTION private.owns_account(p_account_id BIGINT)
+RETURNS BOOLEAN AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.accounts a
+        WHERE a.id = p_account_id
+          AND a.user_id = auth.uid()
+    );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
 
 -- Owners can insert their own records
 CREATE POLICY "Account owners can insert their own names"

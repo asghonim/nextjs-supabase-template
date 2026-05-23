@@ -19,6 +19,15 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          include: ['app/**/*.test.db.{ts,js}', 'lib/**/*.test.db.{ts,js}', 'tests/**/*.test.db.{ts,js}'],
+          name: 'destructive-e2e',
+          environment: 'node',
+          testTimeout: 30000,
+        }
+      },
+      {
+        extends: true,
+        test: {
           include: ['tests/**/*.test.{ts,js}'],
           name: 'tests',
         }

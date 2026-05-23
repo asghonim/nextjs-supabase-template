@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
 type OrgInsert = Database['public']['Tables']['organizations']['Insert']
-type MemberRole = Database['public']['Enums']['org_member_role']
 
 export function createOrganizationsDb(supabase: SupabaseClient<Database>) {
   return {
@@ -26,7 +25,7 @@ export function createOrganizationsDb(supabase: SupabaseClient<Database>) {
     listByAccountId(accountId: number) {
       return supabase
         .from('organizations')
-        .select('*, organization_members!inner(role)')
+        .select('*, organization_members!inner(organization_role_id)')
         .eq('organization_members.account_id', accountId)
     },
 
@@ -76,7 +75,7 @@ export function createOrganizationsDb(supabase: SupabaseClient<Database>) {
     addMember(
       orgId: number,
       accountId: number,
-      role: MemberRole = 'member',
+      organizationRoleId?: number,
       invitedByAccountId?: number,
     ) {
       return supabase
@@ -84,17 +83,17 @@ export function createOrganizationsDb(supabase: SupabaseClient<Database>) {
         .insert({
           organization_id: orgId,
           account_id: accountId,
-          role,
+          organization_role_id: organizationRoleId ?? null,
           invited_by_account_id: invitedByAccountId ?? null,
         })
         .select()
         .single()
     },
 
-    updateMemberRole(memberId: number, role: MemberRole) {
+    updateMemberRole(memberId: number, organizationRoleId: number | null) {
       return supabase
         .from('organization_members')
-        .update({ role })
+        .update({ organization_role_id: organizationRoleId })
         .eq('id', memberId)
         .select()
         .single()

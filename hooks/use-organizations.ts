@@ -6,7 +6,6 @@ import { useDb } from './use-db'
 import type { Database } from '@/types/database'
 
 type OrgInsert = Database['public']['Tables']['organizations']['Insert']
-type MemberRole = Database['public']['Enums']['org_member_role']
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -71,8 +70,8 @@ export function useCreateOrganization() {
 export function useAddOrgMember() {
   const db = useDb()
   return useCallback(
-    (orgId: number, accountId: number, role?: MemberRole, invitedByAccountId?: number) =>
-      db.organizations.addMember(orgId, accountId, role, invitedByAccountId),
+    (orgId: number, accountId: number, organizationRoleId?: number, invitedByAccountId?: number) =>
+      db.organizations.addMember(orgId, accountId, organizationRoleId, invitedByAccountId),
     [db],
   )
 }
@@ -80,8 +79,8 @@ export function useAddOrgMember() {
 export function useUpdateMemberRole() {
   const db = useDb()
   return useCallback(
-    (memberId: number, role: MemberRole) =>
-      db.organizations.updateMemberRole(memberId, role),
+    (memberId: number, organizationRoleId: number | null) =>
+      db.organizations.updateMemberRole(memberId, organizationRoleId),
     [db],
   )
 }

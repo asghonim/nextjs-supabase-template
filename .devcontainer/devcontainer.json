@@ -23,7 +23,8 @@
 				"Anthropic.claude-code",
 				"alexkrechik.cucumberautocomplete",
 				"tamasfe.even-better-toml",
-				"GitHub.vscode-github-actions"
+				"GitHub.vscode-github-actions",
+				"vitest.explorer"
 			]
 		}
 	}

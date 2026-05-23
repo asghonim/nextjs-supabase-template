@@ -296,21 +296,6 @@ CREATE OR REPLACE FUNCTION private.on_insert_notification_digests()     RETURNS 
 CREATE TRIGGER on_notification_digests_inserted     BEFORE INSERT ON public.notification_digests
 	FOR EACH ROW EXECUTE FUNCTION private.on_insert_notification_digests();
 
-
--- ================================================================
--- RLS HELPER
--- ================================================================
-
-CREATE OR REPLACE FUNCTION private.owns_account(p_account_id BIGINT)
-RETURNS BOOLEAN AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM public.accounts a
-        WHERE a.id = p_account_id
-          AND a.user_id = auth.uid()
-    );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
-
-
 -- ================================================================
 -- ROW LEVEL SECURITY
 -- ================================================================

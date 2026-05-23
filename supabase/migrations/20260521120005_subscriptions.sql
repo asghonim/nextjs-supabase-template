@@ -17,7 +17,6 @@
 -- ENUMS
 -- ================================================================
 
-CREATE TYPE public.billing_provider AS ENUM ('stripe', 'paddle', 'manual');
 CREATE TYPE public.billing_interval  AS ENUM ('daily', 'weekly', 'monthly', 'yearly');
 
 CREATE TYPE public.proration_behavior AS ENUM (
@@ -163,12 +162,6 @@ CREATE TYPE public.webhook_event_status AS ENUM (
     'ignored'
 );
 
-
--- ================================================================
--- SHARED UTILITIES
--- ================================================================
-
-
 DROP SEQUENCE IF EXISTS public.invoice_number_seq;
 CREATE SEQUENCE public.invoice_number_seq     START 1;
 DROP SEQUENCE IF EXISTS public.credit_note_number_seq;
@@ -189,77 +182,6 @@ BEGIN
            LPAD(nextval('public.credit_note_number_seq')::TEXT, 6, '0');
 END;
 $$ LANGUAGE plpgsql;
-
-CREATE TABLE public.organizations (
-    id                           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    slug                         TEXT        NOT NULL UNIQUE,
-    owner_account_id             BIGINT      NOT NULL REFERENCES public.accounts(id) ON DELETE RESTRICT,
-    billing_provider             public.billing_provider,
-    billing_provider_customer_id TEXT        UNIQUE,
-    metadata                     JSONB       NOT NULL DEFAULT '{}',
-    created_at                   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at                   TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_organizations_owner
-    ON public.organizations(owner_account_id);
-CREATE INDEX idx_organizations_billing_customer
-    ON public.organizations(billing_provider_customer_id)
-    WHERE billing_provider_customer_id IS NOT NULL;
-
-CREATE OR REPLACE FUNCTION private.on_update_organization()       
-    RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_organization_updated
-    BEFORE UPDATE ON public.organizations
-    FOR EACH ROW EXECUTE FUNCTION private.on_update_organization();
-CREATE OR REPLACE FUNCTION private.on_insert_organizations()                
-    RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_organizations_inserted                
-    BEFORE INSERT ON public.organizations                
-    FOR EACH ROW EXECUTE FUNCTION private.on_insert_organizations();
-
-CREATE TABLE public.organization_names (
-    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    organization_id BIGINT NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name            TEXT    NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX idx_organization_names_org ON public.organization_names(organization_id);
-CREATE OR REPLACE FUNCTION private.on_insert_organization_names()                
-    RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_organization_names_inserted                
-    BEFORE INSERT ON public.organization_names                FOR EACH
-    ROW EXECUTE FUNCTION private.on_insert_organization_names();
-
-CREATE TABLE public.organization_billing_emails (
-    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    organization_id BIGINT NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    billing_email   TEXT    NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX idx_organization_billing_emails_org ON public.organization_billing_emails(organization_id);
-CREATE OR REPLACE FUNCTION private.on_insert_organization_billing_emails()                
-    RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_organization_billing_emails_inserted                
-    BEFORE INSERT ON public.organization_billing_emails 
-    FOR EACH ROW EXECUTE FUNCTION private.on_insert_organization_billing_emails();
-
-CREATE TABLE public.organization_members (
-    id                 BIGINT                 GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    organization_id    BIGINT                 NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    account_id            BIGINT                 NOT NULL REFERENCES public.accounts(id)        ON DELETE CASCADE,
-    role               public.org_member_role NOT NULL DEFAULT 'member',
-    invited_by_account_id BIGINT                 REFERENCES public.accounts(id) ON DELETE SET NULL,
-    joined_at          TIMESTAMPTZ            NOT NULL DEFAULT NOW(),
-    created_at         TIMESTAMPTZ            NOT NULL DEFAULT NOW(),
-    UNIQUE (organization_id, account_id)
-);
-
-CREATE INDEX idx_org_members_account ON public.organization_members(account_id);
-CREATE INDEX idx_org_members_org  ON public.organization_members(organization_id);
-CREATE OR REPLACE FUNCTION private.on_insert_organization_members()
-	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_organization_members_inserted   BEFORE INSERT ON public.organization_members         FOR EACH ROW EXECUTE FUNCTION private.on_insert_organization_members();
 
 CREATE TABLE public.features (
     id          BIGINT               GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -826,6 +748,7 @@ CREATE TABLE public.billing_webhook_events (
     created_at       TIMESTAMPTZ                 NOT NULL DEFAULT NOW(),
     UNIQUE (billing_provider, event_id)
 );
+ALTER TABLE public.billing_webhook_events ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX idx_webhook_events_status
     ON public.billing_webhook_events(status, created_at);
@@ -853,6 +776,7 @@ CREATE TABLE public.idempotency_keys (
     expires_at      TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours'),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE public.idempotency_keys ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX idx_idempotency_keys_expires
     ON public.idempotency_keys(expires_at);
@@ -894,87 +818,8 @@ CREATE TRIGGER on_update_subscription_contract
     FOR EACH ROW EXECUTE FUNCTION private.on_update_subscription_contract();
 CREATE OR REPLACE FUNCTION private.on_insert_subscription_contracts()
 	RETURNS TRIGGER AS $$ BEGIN NEW.created_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql;
-CREATE TRIGGER on_subscription_contracts_inserted BEFORE INSERT ON public.subscription_contracts       FOR EACH ROW EXECUTE FUNCTION private.on_insert_subscription_contracts();
+CREATE TRIGGER on_subscription_contracts_inserted BEFORE INSERT ON public.subscription_contracts FOR EACH ROW EXECUTE FUNCTION private.on_insert_subscription_contracts();
 
-
--- ================================================================
--- RLS HELPER FUNCTIONS
--- ================================================================
-
--- Returns true if the calling user is any member of the org.
-CREATE OR REPLACE FUNCTION private.is_org_member(p_org_id BIGINT)
-RETURNS BOOLEAN AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM public.organization_members om
-        JOIN public.accounts a ON a.id = om.account_id
-        WHERE om.organization_id = p_org_id
-          AND a.user_id = auth.uid()
-    );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
-
--- Returns true if the calling user is owner or admin.
-CREATE OR REPLACE FUNCTION private.is_org_admin(p_org_id BIGINT)
-RETURNS BOOLEAN AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM public.organization_members om
-        JOIN public.accounts a ON a.id = om.account_id
-        WHERE om.organization_id = p_org_id
-          AND a.user_id = auth.uid()
-          AND om.role IN ('owner', 'admin')
-    );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
-
--- Returns true if the calling user can access billing data.
-CREATE OR REPLACE FUNCTION private.is_org_billing(p_org_id BIGINT)
-RETURNS BOOLEAN AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM public.organization_members om
-        JOIN public.accounts a ON a.id = om.account_id
-        WHERE om.organization_id = p_org_id
-          AND a.user_id = auth.uid()
-          AND om.role IN ('owner', 'admin', 'billing')
-    );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
-
-
--- ================================================================
--- ROW LEVEL SECURITY
--- ================================================================
-
--- organizations
-ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow members to view their organization"
-    ON public.organizations FOR SELECT
-    TO authenticated
-    USING (private.is_org_member(id));
-
-ALTER TABLE public.organization_names ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow owner to insert organization name"
-    ON public.organization_names FOR INSERT
-    TO authenticated
-    WITH CHECK (exists(SELECT 1 FROM public.organizations o WHERE o.id = organization_id AND private.is_org_admin(o.id)));
-
-ALTER TABLE public.organization_billing_emails ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow owner to insert billing emails"
-    ON public.organization_billing_emails FOR INSERT
-    TO authenticated
-    WITH CHECK (exists(SELECT 1 FROM public.organizations o WHERE o.id = organization_id AND private.is_org_admin(o.id)));
-
--- organization_members
-ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow members to view org roster"
-    ON public.organization_members FOR SELECT
-    TO authenticated
-    USING (private.is_org_member(organization_id));
-
-CREATE POLICY "Allow admins to manage org membership"
-    ON public.organization_members FOR ALL
-    TO authenticated
-    USING (private.is_org_admin(organization_id));
-
--- plans (public catalog — any authenticated user can read)
 ALTER TABLE public.plans ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated users to read active public plans"
@@ -982,7 +827,6 @@ CREATE POLICY "Allow authenticated users to read active public plans"
     TO authenticated
     USING (is_active = TRUE);
 
--- plan_versions
 ALTER TABLE public.plan_versions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated users to read active plan versions"
@@ -990,7 +834,6 @@ CREATE POLICY "Allow authenticated users to read active plan versions"
     TO authenticated
     USING (is_active = TRUE);
 
--- features
 ALTER TABLE public.features ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated users to read active features"
@@ -998,7 +841,6 @@ CREATE POLICY "Allow authenticated users to read active features"
     TO authenticated
     USING (is_active = TRUE);
 
--- plan_feature_entitlements
 ALTER TABLE public.plan_feature_entitlements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated users to read plan entitlements"
@@ -1006,7 +848,6 @@ CREATE POLICY "Allow authenticated users to read plan entitlements"
     TO authenticated
     USING (TRUE);
 
--- addons
 ALTER TABLE public.addons ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated users to read active addons"
@@ -1014,7 +855,6 @@ CREATE POLICY "Allow authenticated users to read active addons"
     TO authenticated
     USING (is_active = TRUE);
 
--- addon_versions
 ALTER TABLE public.addon_versions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated users to read active addon versions"
@@ -1022,7 +862,6 @@ CREATE POLICY "Allow authenticated users to read active addon versions"
     TO authenticated
     USING (is_active = TRUE);
 
--- addon_feature_entitlements
 ALTER TABLE public.addon_feature_entitlements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow authenticated users to read addon entitlements"
@@ -1030,7 +869,6 @@ CREATE POLICY "Allow authenticated users to read addon entitlements"
     TO authenticated
     USING (TRUE);
 
--- subscriptions
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view subscriptions"
@@ -1038,7 +876,6 @@ CREATE POLICY "Allow billing role to view subscriptions"
     TO authenticated
     USING (private.is_org_billing(organization_id));
 
--- subscription_addons
 ALTER TABLE public.subscription_addons ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view subscription addons"
@@ -1052,7 +889,6 @@ CREATE POLICY "Allow billing role to view subscription addons"
         )
     );
 
--- subscription_change_requests
 ALTER TABLE public.subscription_change_requests ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view change requests"
@@ -1068,7 +904,6 @@ CREATE POLICY "Allow billing role to create change requests"
         AND requested_by_account_id IN (SELECT id FROM public.accounts WHERE user_id = auth.uid())
     );
 
--- invoices
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view invoices"
@@ -1076,7 +911,6 @@ CREATE POLICY "Allow billing role to view invoices"
     TO authenticated
     USING (private.is_org_billing(organization_id));
 
--- invoice_line_items
 ALTER TABLE public.invoice_line_items ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view invoice line items"
@@ -1090,7 +924,6 @@ CREATE POLICY "Allow billing role to view invoice line items"
         )
     );
 
--- credit_notes
 ALTER TABLE public.credit_notes ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view credit notes"
@@ -1098,7 +931,6 @@ CREATE POLICY "Allow billing role to view credit notes"
     TO authenticated
     USING (private.is_org_billing(organization_id));
 
--- payments
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view payments"
@@ -1106,7 +938,6 @@ CREATE POLICY "Allow billing role to view payments"
     TO authenticated
     USING (private.is_org_billing(organization_id));
 
--- subscription_entitlements
 ALTER TABLE public.subscription_entitlements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow org members to read their entitlements"
@@ -1114,7 +945,6 @@ CREATE POLICY "Allow org members to read their entitlements"
     TO authenticated
     USING (private.is_org_member(organization_id));
 
--- usage_records
 ALTER TABLE public.usage_records ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow org members to view usage records"
@@ -1122,7 +952,6 @@ CREATE POLICY "Allow org members to view usage records"
     TO authenticated
     USING (private.is_org_member(organization_id));
 
--- usage_summaries
 ALTER TABLE public.usage_summaries ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow org members to view usage summaries"
@@ -1130,7 +959,6 @@ CREATE POLICY "Allow org members to view usage summaries"
     TO authenticated
     USING (private.is_org_member(organization_id));
 
--- subscription_events
 ALTER TABLE public.subscription_events ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view subscription events"
@@ -1138,7 +966,6 @@ CREATE POLICY "Allow billing role to view subscription events"
     TO authenticated
     USING (private.is_org_billing(organization_id));
 
--- subscription_contracts
 ALTER TABLE public.subscription_contracts ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow billing role to view contracts"
