@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 import { getSupabaseAdminClient } from './admin'
 import { ApiKeyContext } from '@/lib/supabase/proxy'
+import { sign } from 'jsonwebtoken'
 
 /**
  * Creates a Supabase client for use inside Next.js Route Handlers that are
@@ -30,20 +31,10 @@ import { ApiKeyContext } from '@/lib/supabase/proxy'
  * client, and there is no response object available at this call site.
  */
 export async function getSupabaseApiClient(request: NextRequest) {
-  const client = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll() {
-          // No-op — see JSDoc above.
-        },
-      },
-    },
-  )
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  if (!secret) {
+    throw new Error('Missing SUPABASE_JWT_SECRET environment variable')
+  }
   const admin = getSupabaseAdminClient()
   const api_key_context = request.headers.get('x-api-key-context')
   if (!api_key_context) {
@@ -64,26 +55,34 @@ export async function getSupabaseApiClient(request: NextRequest) {
   if (!user.user.email) {
     throw new Error('User has no email')
   }
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email: user.user.email,
-  })
-  if (linkError || !linkData) {
-    throw new Error('Failed to generate magic link for service account user')
+  const payload = {
+    aud: 'authenticated',
+    role: 'authenticated',
+    sub: user.user.id,
+    api: true,
   }
-  const { data: sessionData, error: sessionError } = await client.auth.verifyOtp({
-    token_hash: linkData.properties.hashed_token,
-    type: 'magiclink'
-  })
-
-  if (sessionError || !sessionData?.session || !sessionData.session.access_token || !sessionData.session.refresh_token) {
-    throw new Error('Failed to verify OTP for service account user')
-  }
-
-  await client.auth.setSession({
-    access_token: sessionData.session.access_token,
-    refresh_token: sessionData.session.refresh_token,
+  const authToken = sign(payload, secret, {
+    expiresIn: '1minute', // Short-lived token since it's only used to exchange for a session
   });
+  const client = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      },
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll() {
+          // No-op — see JSDoc above.
+        },
+      },
+    },
+  )
 
   return client;
 }
